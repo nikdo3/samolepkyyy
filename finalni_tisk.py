@@ -10,34 +10,44 @@ from rectpack import newPacker
 VSTUPNI_SLOZKA = Path(r'K:\tomik_samolepky\bez_pozadi')
 
 # Kam uložit finální vícestránkové PDF
-VYSTUPNI_PDF = Path(r'K:\tomik_samolepky\samolepky_k_tisku_1200dpi_NORMALIZED.pdf')
+VYSTUPNI_PDF = Path(r'K:\tomik_samolepky\samolepky_k_tisku_FINAL.pdf')
 
 # Rozlišení tisku
 PRINT_DPI = 1200
 
+# === NOVÉ: NASTAVENÍ OKRAJŮ TISKU ===
+# Okraj (v cm), který zůstane na A4 prázdný. 0.5 cm je bezpečné.
+MARGIN_CM = 0.5
+MARGIN_PX = int((MARGIN_CM / 2.54) * PRINT_DPI)
+
 # === NASTAVENÍ VELIKOSTI SAMOLEPEK ===
 # Velikost nejdelší strany KAŽDÉ samolepky v centimetrech.
-# Všechny samolepky budou mít svou nejdelší stranu takto velkou.
-STICKER_SIZE_CM = 4.5
-# Přepočet na pixely
+STICKER_SIZE_CM = 5.0
 NORMALIZED_SIDE_PX = int((STICKER_SIZE_CM / 2.54) * PRINT_DPI)
 
 # Mezera mezi samolepkami v cm (přepočte se na pixely)
 SPACING_CM = 0.15
-SPACING_PX = int((SPACING_CM / 2.54) * PRINT_DPI) # Bude cca 70px
+SPACING_PX = int((SPACING_CM / 2.54) * PRINT_DPI) 
 
-# Rozměry A4 v pixelech (už není potřeba je nastavovat ručně)
+# Rozměry A4 (plná velikost)
 A4_WIDTH_MM = 210
 A4_HEIGHT_MM = 297
 A4_WIDTH_PX = int((A4_WIDTH_MM / 25.4) * PRINT_DPI)  # 9921 px
 A4_HEIGHT_PX = int((A4_HEIGHT_MM / 25.4) * PRINT_DPI) # 14031 px
 
+# === PLOCHA PRO TISK (A4 mínus okraje) ===
+PRINTABLE_WIDTH_PX = A4_WIDTH_PX - (2 * MARGIN_PX)
+PRINTABLE_HEIGHT_PX = A4_HEIGHT_PX - (2 * MARGIN_PX)
+
 # -----------------------------------------------------------------
 
 def create_sticker_pdf():
-    print(f"--- Spuštěno finální zpracování (Ořez + Normalizace + Skládání) ---")
-    print(f"Cílové rozlišení: {PRINT_DPI} DPI ({A4_WIDTH_PX}x{A4_HEIGHT_PX} px).")
-    print(f"Normalizovaná velikost (nejdelší strana): {STICKER_SIZE_CM} cm ({NORMALIZED_SIDE_PX} px)")
+    print(f"--- Spuštěno finální zpracování (Ořez + Normalizace + Skládání s okraji) ---")
+    print(f"Cílové rozlišení: {PRINT_DPI} DPI.")
+    print(f"Velikost stránky A4: {A4_WIDTH_PX}x{A4_HEIGHT_PX} px")
+    print(f"Okraj stránky: {MARGIN_CM} cm ({MARGIN_PX} px)")
+    print(f"Tisknutelná plocha: {PRINTABLE_WIDTH_PX}x{PRINTABLE_HEIGHT_PX} px")
+    print(f"Normalizovaná velikost samolepky: {STICKER_SIZE_CM} cm ({NORMALIZED_SIDE_PX} px)")
     print(f"Mezera mezi samolepkami: {SPACING_CM} cm ({SPACING_PX} px)")
 
     # --- Krok 1: Ořezat, normalizovat a připravit obdélníky ---
@@ -55,7 +65,6 @@ def create_sticker_pdf():
         try:
             with Image.open(file_path) as img:
                 
-                # --- Logika ořezu ---
                 bbox = img.getbbox()
                 if not bbox:
                     print(f"Přeskočeno: {file_path.name} (je prázdný)")
@@ -63,28 +72,22 @@ def create_sticker_pdf():
                 
                 cropped_img = img.crop(bbox)
                 
-                # --- Logika normalizace velikosti ---
                 w, h = cropped_img.size
                 if w > h:
-                    # Širší než vyšší
                     new_w = NORMALIZED_SIDE_PX
-                    new_h = int(new_w * (h / w)) # Zachovat poměr stran
+                    new_h = int(new_w * (h / w))
                 else:
-                    # Vyšší než širší (nebo čtverec)
                     new_h = NORMALIZED_SIDE_PX
-                    new_w = int(new_h * (w / h)) # Zachovat poměr stran
+                    new_w = int(new_h * (w / h))
 
-                # --- Logika přípravy pro balení ---
-                # Uložíme si ořezaný obrázek A JEHO FINÁLNÍ NORMALIZOVANÉ ROZMĚRY
                 image_map[img_id_counter] = (cropped_img.copy(), new_w, new_h)
                 
-                # Packerovi dáme rozměr VČETNĚ mezery
                 rect_w = new_w + SPACING_PX
                 rect_h = new_h + SPACING_PX
                 
-                if rect_w > A4_WIDTH_PX or rect_h > A4_HEIGHT_PX:
+                if rect_w > PRINTABLE_WIDTH_PX or rect_h > PRINTABLE_HEIGHT_PX:
                     print(f"VAROVÁNÍ: Obrázek {file_path.name} je i po normalizaci ({new_w}x{new_h}px) "
-                          f"stále větší než stránka A4. To by se nemělo stávat.")
+                          f"stále větší než tisknutelná plocha A4. Zmenšete STICKER_SIZE_CM.")
                     continue
 
                 rectangles_to_pack.append((rect_w, rect_h, img_id_counter))
@@ -102,15 +105,14 @@ def create_sticker_pdf():
     # --- Krok 2: Spustit balicí algoritmus ---
     print("Optimalizuji rozložení na stránky (může to chvíli trvat)...")
     
-    # Vypneme otáčení, abychom předešli deformacím.
-    # Je to méně efektivní pro místo, ale 100% spolehlivé.
     packer = newPacker(rotation=False) 
     
     for r in rectangles_to_pack:
         packer.add_rect(r[0], r[1], rid=r[2])
 
+    # Přidáme "boxy" o velikosti TISKNUTELNÉ PLOCHY
     for i in range(len(rectangles_to_pack)): 
-        packer.add_bin(A4_WIDTH_PX, A4_HEIGHT_PX)
+        packer.add_bin(PRINTABLE_WIDTH_PX, PRINTABLE_HEIGHT_PX)
 
     packer.pack()
 
@@ -122,24 +124,23 @@ def create_sticker_pdf():
     
     for i, page in enumerate(all_pages):
         print(f"Generuji PDF stranu {i+1} / {len(all_pages)}...")
+        
+        # Vytvoříme stránku o PLNÉ velikosti A4
         page_image = Image.new('RGBA', (A4_WIDTH_PX, A4_HEIGHT_PX), 'WHITE')
         
         for rect in page:
             rid = rect.rid
             
-            # Získáme obrázek A JEHO SPRÁVNÉ NORMALIZOVANÉ ROZMĚRY
             original_img, target_w, target_h = image_map[rid]
-            
-            # Zmenšíme obrázek na cílovou velikost
             sticker_img = original_img.resize((target_w, target_h), Image.LANCZOS)
             
-            # === OPRAVA PŘEKRÝVÁNÍ ===
-            # Vložíme obrázek doprostřed jeho přiděleného bloku
-            # (rect.x, rect.y) je levý horní roh bloku, který je o SPACING_PX větší
-            paste_x = rect.x + (SPACING_PX // 2)
-            paste_y = rect.y + (SPACING_PX // 2)
+            # === OPRAVA: PŘIDÁNÍ OKRAJE ===
+            # (rect.x, rect.y) je pozice uvnitř tisknutelného boxu.
+            # Musíme k ní přičíst levý/horní okraj (MARGIN_PX)
+            # a také polovinu mezery pro centrování.
+            paste_x = rect.x + (SPACING_PX // 2) + MARGIN_PX
+            paste_y = rect.y + (SPACING_PX // 2) + MARGIN_PX
             
-            # Vlepíme ho na stránku
             page_image.paste(sticker_img, (paste_x, paste_y), sticker_img)
             
         pdf_pages.append(page_image.convert('RGB')) 
