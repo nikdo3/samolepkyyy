@@ -1,10 +1,10 @@
 import os
 import sys
 import site
-import io 
+import io # <<< NOVÝ IMPORT
 from pathlib import Path
 from rembg import remove, new_session
-from PIL import Image, ImageChops 
+from PIL import Image, ImageChops # <<< UPRAVENÝ IMPORT
 
 # --- ZAČÁTEK OPRAVY PRO cuDNN ---
 # (Tohle zůstává stejné)
@@ -59,24 +59,33 @@ def process_image_combined(input_path: Path, output_folder: Path, session_a, ses
             input_data = f.read()
 
         # --- Model A (Agresivní) ---
+        print(f" -> Krok 1: Model {session_a.model_name}")
         output_data_A = remove(input_data, session=session_a, alpha_matting=False)
         img_A = Image.open(io.BytesIO(output_data_A))
         mask_A = img_A.split()[-1] # Získáme jen Alfa kanál (masku)
 
         # --- Model B (Volnější) ---
+        print(f" -> Krok 2: Model {session_b.model_name}")
         output_data_B = remove(input_data, session=session_b, alpha_matting=False)
         img_B = Image.open(io.BytesIO(output_data_B))
         mask_B = img_B.split()[-1] # Získáme jen Alfa kanál (masku)
 
         # --- Kombinace masek ---
-        # <<< OPRAVA ZDE >>>
-        # ImageChops.lighter vezme světlejší pixel z obou masek.
+        print(" -> Krok 3: Kombinace masek...")
+        # ImageChops.max vezme světlejší pixel z obou masek.
         # Tzn. pokud A řekne "pozadí" (0) a B řekne "popředí" (255), výsledek je 255.
         # Přesně to chceme: "ponech, pokud si ALESPOŇ JEDEN model myslí, že to je popředí".
-        final_mask = ImageChops.lighter(mask_A, mask_B)
+        final_mask = ImageChops.max(mask_A, mask_B)
 
         # --- Aplikace finální masky na originál ---
         original_img = Image.open(io.BytesIO(input_data)).convert("RGBA")
+        
+        # <<< OPRAVA: Ujistíme se, že originál a maska mají stejné rozměry >>>
+        # Někdy se může stát, že rembg vrátí obrázek o 1px menší/větší
+        if original_img.size != final_mask.size:
+            print(f" -> Varování: Maska ({final_mask.size}) a originál ({original_img.size}) mají různé rozměry. Maska bude přizpůsobena.")
+            final_mask = final_mask.resize(original_img.size, Image.LANCZOS)
+
         original_img.putalpha(final_mask)
         
         # Uložení výsledku
@@ -102,7 +111,7 @@ if __name__ == "__main__":
     print(f"--- Spuštěno kombinované zpracování samolepek ---")
     print(f"Vstupní složka: {VSTUPNI_SLOZKA}")
     print(f"Výstupní složka: {VYSTUPNI_SLOZKA}")
-    print(f"Použité modely: {MODEL_A} (přesný) + {MODEL_B} (volnější)")
+    print(f"Použité modely: {MODEL_A} (přesný) + {MODEL_B (volnější)}")
 
     processed_count = 0
     for file_type in TYPY_SOUBORU:
