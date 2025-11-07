@@ -5,6 +5,8 @@ from PIL import Image
 from rectpack import newPacker
 
 # --- KONFIGURACE ---
+Image.MAX_IMAGE_PIXELS = None
+
 
 # Odkud brát PNG obrázky bez pozadí
 VSTUPNI_SLOZKA = Path(r'K:\tomik_samolepky\bez_pozadi')

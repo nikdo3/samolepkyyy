@@ -33,19 +33,20 @@ from rembg import remove, new_session
 from PIL import Image
 
 # --- KONFIGURACE ---
+Image.MAX_IMAGE_PIXELS = None
 
 # Zvolený model pro odstranění pozadí.
 POUZITY_MODEL = "birefnet-massive"
 
 # Cesty ke složkám (UPRAV PODLE SEBE)
-VSTUPNI_SLOZKA = Path(r'K:\tomik_samolepky\upskejld\upscayl_png_high-fidelity-4x_5x')
+VSTUPNI_SLOZKA = Path(r'K:\tomik_samolepky\upskejld\upscayl_png_digital-art-4x_5x')
 VYSTUPNI_SLOZKA = Path(r'K:\tomik_samolepky\bez_pozadi')
 
 # Jaké typy souborů má skript zpracovávat?
 TYPY_SOUBORU = ['*.jpg', '*.png', '*.jpeg']
 
 # Parametry pro jemné doladění (alpha matting)
-POUZIT_ALPHA_MATTING = True # Změnil jsi na True, tak to nechávám
+POUZIT_ALPHA_MATTING = False # Změnil jsi na True, tak to nechávám
 ALPHA_MATTING_FOREGROUND_THRESHOLD = 240
 ALPHA_MATTING_BACKGROUND_THRESHOLD = 10
 ALPHA_MATTING_ERODE_SIZE = 10
