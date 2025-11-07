@@ -1,10 +1,10 @@
 import os
 import sys
 import site
-import io # <<< NOVÝ IMPORT
+import io 
 from pathlib import Path
 from rembg import remove, new_session
-from PIL import Image, ImageChops # <<< UPRAVENÝ IMPORT
+from PIL import Image, ImageChops 
 
 # --- ZAČÁTEK OPRAVY PRO cuDNN ---
 # (Tohle zůstává stejné)
@@ -69,10 +69,11 @@ def process_image_combined(input_path: Path, output_folder: Path, session_a, ses
         mask_B = img_B.split()[-1] # Získáme jen Alfa kanál (masku)
 
         # --- Kombinace masek ---
-        # ImageChops.max vezme světlejší pixel z obou masek.
+        # <<< OPRAVA ZDE >>>
+        # ImageChops.lighter vezme světlejší pixel z obou masek.
         # Tzn. pokud A řekne "pozadí" (0) a B řekne "popředí" (255), výsledek je 255.
         # Přesně to chceme: "ponech, pokud si ALESPOŇ JEDEN model myslí, že to je popředí".
-        final_mask = ImageChops.max(mask_A, mask_B)
+        final_mask = ImageChops.lighter(mask_A, mask_B)
 
         # --- Aplikace finální masky na originál ---
         original_img = Image.open(io.BytesIO(input_data)).convert("RGBA")
